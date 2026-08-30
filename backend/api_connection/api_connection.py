@@ -46,7 +46,7 @@ def test_server_connection():
     return { 'message': 'herkese merhaba!!' }
 
 @app.get('/students')
-async def read_all_students(db: DBSession):
+async def read_students(db: DBSession):
     async with db.cursor() as cur:
         await cur.execute("SELECT * FROM students;")
         return await cur.fetchall()
@@ -76,6 +76,37 @@ async def read_student(
             "full_name": row[3],
             "placement_test": row[4],
             "sample_Class": row[5]
+        }
+
+@app.get('/groups')
+async def read_groups(db: DBSession):
+    async with db.cursor() as cur:
+        await cur.execute("SELECT * FROM groups;")
+        return await cur.fetchall()
+
+@app.get('/groups/id/{group_id}')
+async def read_group(
+    group_id: int,
+    db: DBSession
+):
+    async with db.cursor() as cur:
+        await cur.execute("SELECT * FROM groups WHERE group_id = %s;", (group_id,))
+
+        row = await cur.fetchone()
+
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Group with ID {group_id} not found"
+            )
+
+        return {
+            "group_id": row[0],
+            "level": row[1],
+            "schedule_time_start": row[2],
+            "schedule_time_finish": row[3],
+            "date_start": row[4],
+            "date_finish": row[5]
         }
 
 @app.post('/groups/', status_code=status.HTTP_201_CREATED)
@@ -110,6 +141,35 @@ async def create_group(
         return {
             "group_id": new_group_id,
             "message": "Group created successfully"
+        }
+
+@app.get('/customers')
+async def read_customers(db: DBSession):
+    async with db.cursor() as cur:
+        await cur.execute("SELECT * FROM customers;")
+        return await cur.fetchall()
+
+@app.get('/customers/id/{customer_jid}')
+async def read_customer(
+    customer_jid: str,
+    db: DBSession
+):
+    async with db.cursor() as cur:
+        await cur.execute("SELECT * FROM customers WHERE jid = %s;", (customer_jid,))
+
+        row = await cur.fetchone()
+
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Customer with ID {customer_jid} not found"
+            )
+
+        return {
+            "jid": row[0],
+            "full_name": row[1],
+            "nickname": row[2],
+            "phone_number": row[3]
         }
 
 @app.post('/customers/', status_code=status.HTTP_201_CREATED)
