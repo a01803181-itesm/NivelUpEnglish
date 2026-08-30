@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Path, Form
+from fastapi import FastAPI, Depends, HTTPException, status, Path
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 from db_handler import Connection, PostgreManager
@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from typing import Annotated, AsyncGenerator
 from psycopg import AsyncConnection
-from db_schemas import CreateGroup, CreateCustomer
+from db_schemas import CreateGroup, CreateCustomer, CreateStudent
 import os
 
 load_dotenv()
@@ -139,7 +139,7 @@ async def create_customer(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database failed to return the new customer JID"
             )
-        new_customer_jid = row[0]
+        new_customer_jid: str = row[0]
         return {
             "customer_jid": new_customer_jid,
             "message": "Customer created successfully"
@@ -148,10 +148,35 @@ async def create_customer(
 
 @app.post('/students/')
 async def create_student(
-    student_id: int = Form(...),
-    customer_jid: str = Form(...),
-    group_id: int = Form(...)
-):
-    ...
+    student_data: CreateStudent,
+    db: DBSession
+) -> dict[str, str | int]:
+    async with db.cursor() as cur:
+        await cur.execute(
+            """
+            INSERT INTO students
+            (customer_jid, group_id, full_name, placement_test, sample_class)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING student_id;
+            """,
+            (
+                student_data.customer_jid,
+                student_data.group_id,
+                student_data.full_name,
+                student_data.placement_test,
+                student_data.sample_class
+            )
+        )
+        row = await cur.fetchone()
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database failed to return the new student ID"
+            )
+        new_student_id: int = row[0]
+        return {
+            "student_id": new_student_id,
+            "message": "Student created successfully"
+        }
 
 handler: Mangum = Mangum(app=app)
