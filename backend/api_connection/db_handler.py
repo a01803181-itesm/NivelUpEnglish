@@ -1,35 +1,41 @@
-import mysql.connector
-from mysql.connector import Error
-from mysql.connector.abstracts import MySQLConnectionAbstract
-from mysql.connector.pooling import PooledMySQLConnection
 from dataclasses import dataclass
+from contextlib import asynccontextmanager
+from psycopg import AsyncConnection
+from psycopg_pool import AsyncConnectionPool
+from typing import AsyncGenerator
+import urllib.parse
 
 @dataclass
-class Credentials:
+class Connection:
     host: str
     user: str
     password: str
     database: str
+    port: str
 
-class DBHandler:
-    __connection: MySQLConnectionAbstract | PooledMySQLConnection | None
-    def __init__(self, creds: Credentials) -> None:
-        self.__connection = None
-        try:
-            self.__connection = mysql.connector.connect(
-                host=creds.host,
-                user=creds.user,
-                password=creds.password,
-                database=creds.database
-            )
-        except Error as e:
-            print(f"Error while establishing connection with MySQL service: {e}")
-            raise
+class PostgreManager:
+    __pool: AsyncConnectionPool
+    __url: str
+    def __init__(self, connection: Connection) -> None:
+        self.__url = f'postgresql://{connection.user}:{urllib.parse.quote_plus(connection.password)}@{connection.host}:{connection.port}/{connection.database}'
+        self.__pool: AsyncConnectionPool = AsyncConnectionPool(
+            conninfo=self.__url,
+            open=False,
+            min_size=4,
+            max_size=50
+        )
 
     @property
-    def is_connected(self) -> bool:
-        return self.__connection.is_connected
+    def db_url(self) -> str:
+        return self.__url
 
-    def __del__(self) -> None:
-        if self.__connection and self.__connection.is_connected():
-            self.__connection.close()
+    async def initialize(self) -> None:
+        await self.__pool.open()
+
+    async def close(self) -> None:
+        await self.__pool.close()
+
+    @asynccontextmanager
+    async def get_connection(self) -> AsyncGenerator[AsyncConnection, None]:
+        async with self.__pool.connection() as connection:
+            yield connection

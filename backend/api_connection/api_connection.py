@@ -1,13 +1,31 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException, status, Path, Form
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
-from db_handler import Credentials, DBHandler
+from db_handler import Connection, PostgreManager
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
+from typing import Annotated, AsyncGenerator
+from psycopg import AsyncConnection
+from db_schemas import CreateGroup, CreateCustomer
 import os
 
-app = FastAPI()
-
 load_dotenv()
+connection: Connection = Connection(
+    database=os.getenv('DB_NAME', ""),
+    host=os.getenv('DB_HOST', "postgres"),
+    password=os.getenv('DB_PASSWORD', ""),
+    user=os.getenv('DB_USER', "postgres"),
+    port=os.getenv('DB_PORT', "5432")
+)
+db_manager: PostgreManager = PostgreManager(connection)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await db_manager.initialize()
+    yield
+    await db_manager.close()
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,38 +35,123 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-@app.get('/check-db')
-def test_db_connection():
-    creds: Credentials = Credentials(
-        database=os.getenv('DB_NAME'),
-        host=os.getenv('DB_HOST'),
-        password=os.getenv('DB_PASSWORD'),
-        user=os.getenv('DB_USER')
-    )
-    success: bool
-    error: str | None = None
-    try:
-        db_handler: DBHandler = DBHandler(creds)
-        success = True
-    except Exception as e:
-        print(f'Error when trying to establish connection to the db: {e}')
-        success = False
-    finally:
-        del db_handler
-        return { 'connection_successful': success } if success else { 'connection_successful': success, 'error': error }
+async def get_db() -> AsyncGenerator[AsyncConnection, None]:
+    async with db_manager.get_connection() as conn:
+        yield conn
+
+type DBSession = Annotated[AsyncConnection, Depends(get_db)]
 
 @app.get('/check')
 def test_server_connection():
     return { 'message': 'herkese merhaba!!' }
 
-handler: Mangum = Mangum(app=app)
+@app.get('/students')
+async def read_all_students(db: DBSession):
+    async with db.cursor() as cur:
+        await cur.execute("SELECT * FROM students;")
+        return await cur.fetchall()
 
-if __name__ == '__main__':
-    creds: Credentials = Credentials(
-        database=os.getenv('DB_NAME'),
-        host=os.getenv('DB_HOST'),
-        password=os.getenv('DB_PASSWORD'),
-        user=os.getenv('DB_USER')
-    )
-    db_handler: DBHandler = DBHandler(creds)
-    del db_handler
+@app.get('/students/id/{student_id}')
+async def read_student(
+    db: DBSession,
+    student_id: int = Path(title="Student ID of the student to get", ge=1)
+):
+    async with db.cursor() as cur:
+        await cur.execute(
+            "SELECT * FROM students WHERE student_id = %s;",
+            (student_id,)
+        )
+        row = await cur.fetchone()
+
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Student with ID {student_id} not found"
+            )
+
+        return {
+            "student_id": row[0],
+            "customer_jid": row[1],
+            "group_id": row[2],
+            "full_name": row[3],
+            "placement_test": row[4],
+            "sample_Class": row[5]
+        }
+
+@app.post('/groups/', status_code=status.HTTP_201_CREATED)
+async def create_group(
+    group_data: CreateGroup,
+    db: DBSession
+) -> dict[str, str | int]:
+    async with db.cursor() as cur:
+        await cur.execute(
+            """
+            INSERT INTO groups
+            (level, schedule_time_start, schedule_time_finish, date_Start, date_finish)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING group_id;
+            """,
+            (
+                group_data.level,
+                group_data.schedule_time_start,
+                group_data.schedule_time_finish,
+                group_data.date_start,
+                group_data.date_finish
+            )
+        )
+        row = await cur.fetchone()
+
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database failed to return the new group ID"
+            )
+        new_group_id: int = row[0]
+        return {
+            "group_id": new_group_id,
+            "message": "Group created successfully"
+        }
+
+@app.post('/customers/', status_code=status.HTTP_201_CREATED)
+async def create_customer(
+    customer_data: CreateCustomer,
+    db: DBSession
+) -> dict[str, str]:
+    async with db.cursor() as cur:
+        await cur.execute(
+            """
+            INSERT INTO customers
+            (jid, full_name, nickname, phone_number)
+            VALUES
+            (%s, %s, %s, %s)
+            RETURNING jid;
+            """,
+            (
+                customer_data.jid,
+                customer_data.full_name,
+                customer_data.nickname,
+                customer_data.phone_number
+            )
+        )
+        row = await cur.fetchone()
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database failed to return the new customer JID"
+            )
+        new_customer_jid = row[0]
+        return {
+            "customer_jid": new_customer_jid,
+            "message": "Customer created successfully"
+        }
+
+
+@app.post('/students/')
+async def create_student(
+    student_id: int = Form(...),
+    customer_jid: str = Form(...),
+    group_id: int = Form(...)
+):
+    ...
+
+handler: Mangum = Mangum(app=app)
