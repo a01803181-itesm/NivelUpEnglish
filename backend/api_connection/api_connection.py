@@ -8,6 +8,7 @@ from typing import Annotated, AsyncGenerator
 from psycopg import AsyncConnection
 from db_schemas import CreateGroup, CreateCustomer, CreateStudent
 import os
+from google_drive_connection import get_drive_service
 
 load_dotenv()
 connection: Connection = Connection(
@@ -44,6 +45,39 @@ type DBSession = Annotated[AsyncConnection, Depends(get_db)]
 @app.get('/check')
 def test_server_connection():
     return { 'message': 'herkese merhaba!!' }
+
+@app.get('/api/test/drive')
+async def get_course_resources():
+    try:
+        service = get_drive_service()
+
+        FOLDER_ID = '1uUQYDZqiXw7220faoQV8TQBT7QStq5bG'
+
+        query = f"'{FOLDER_ID}' in parents and mimeType='application/pdf' and trashed=false"
+
+        results = service.files().list(
+            q=query,
+            pageSize=50,
+            fields="files(id, name, webViewLink, description)",
+            orderBy="name"
+        ).execute()
+
+        items = results.get('files', [])
+
+        resources = []
+        for item in items:
+            resources.append({
+                "id": item.get("id"),
+                "title": item.get("name").replace(".pdf", ""),
+                "file_url": item.get("webViewLink"),
+                "description": item.get("description", "Class material"),
+            })
+
+        return {"resources": resources}
+
+    except Exception as e:
+        print(f"Error fetching from Google Drive: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch course materials")
 
 @app.get('/students')
 async def read_students(db: DBSession):

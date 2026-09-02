@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { UserData } from '../components/types';
+import { auth, googleProvider } from '../lib/firebase';
+import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 
 export interface AuthError {
   type: 'auth_required' | 'user_not_registered' | 'unknown';
@@ -14,7 +16,7 @@ export interface AuthContextType {
   authError: AuthError | null;
   logout: (shouldRedirect?: boolean) => void;
   navigateToLogin: () => void;
-  checkUserAuth: () => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,75 +29,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authChecked, setAuthChecked] = useState<boolean>(false);
 
   useEffect(() => {
-    checkUserAuth();
-  }, []);
-
-  const checkUserAuth = async () => {
-    setIsLoadingAuth(true);
-    setAuthError(null);
-
-    try {
-      // TODO: Replace this block with Firebase / AWS Cognito / Custom API logic later
-      // For now, a successful login is simulated to allow UI development
-      
-      /* EXAMPLE: Firebase integration:
-      const currentUser = await firebase.auth().currentUser;
-      if (currentUser) {
-        setUser({ full_name: currentUser.displayName, email: currentUser.email });
-        setIsAuthenticated(true);
-      } else {
-        throw new Error("No user found");
-      }
-      */
-
-      setTimeout(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
         setUser({
-          full_name: "Alexander Mejia",
-          email: "alexander@nivelup.com"
+          full_name: firebaseUser.displayName || undefined,
+          email: firebaseUser.email || undefined,
         });
         setIsAuthenticated(true);
-        setIsLoadingAuth(false);
-        setAuthChecked(true);
-      }, 500);
-
-    } catch (error: any) {
-      console.error('User auth check failed:', error);
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
       setIsLoadingAuth(false);
-      setIsAuthenticated(false);
       setAuthChecked(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const loginWithGoogle = async () => {
+    setAuthError(null);
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error: any) {
+      console.error('Google login failed:', error);
       setAuthError({
-        type: 'auth_required',
-        message: 'Authentication required'
+        type: 'unknown',
+        message: error.message || 'Failed to login with Google'
       });
     }
   };
 
-  const logout = (shouldRedirect: boolean = true) => {
-    setUser(null);
-    setIsAuthenticated(false);
-    
-    // TODO: Add Firebase/Cognito logout here later
-    // EXAMPLE: await firebase.auth().signOut();
+  const navigateToLogin = () => window.location.href = '/login';
 
-    if (shouldRedirect) {
-      window.location.href = '/login'; 
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      navigateToLogin();
+    } catch (error) {
+      console.error('Logout failed:', error);
     }
   };
 
-  const navigateToLogin = () => {
-    window.location.href = '/login';
-  };
-
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isAuthenticated, 
+    <AuthContext.Provider value={{
+      user,
+      isAuthenticated,
       isLoadingAuth,
       authError,
       authChecked,
       logout,
       navigateToLogin,
-      checkUserAuth
+      loginWithGoogle
     }}>
       {children}
     </AuthContext.Provider>

@@ -1,4 +1,4 @@
-import { useState, type SyntheticEvent } from "react";
+import { useEffect, useState, type SyntheticEvent } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -7,32 +7,35 @@ import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "../components/AuthLayout";
 import GoogleIcon from "../components/GoogleIcon";
 import { safeReturnTo } from "../lib/authReturnTo";
+import { useAuth } from "../lib/AuthContext";
 
 export default function Login() {
+  const { loginWithGoogle, isLoadingAuth, isAuthenticated } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  // Post-login destination (e.g. the MCP OAuth consent page sends users here
-  // with returnTo so the grant flow can resume). Same-origin paths only.
+
   const returnTo = safeReturnTo();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      window.location.href = returnTo;
+    }
+  }, [isAuthenticated, returnTo]);
 
   const handleSubmit = async (e: SyntheticEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      // TODO: Implement login logic
       window.location.href = returnTo;
     } catch (err: any) {
       setError(err.message || "Invalid email or password");
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleGoogle = () => {
-    // TODO
   };
 
   return (
@@ -55,7 +58,8 @@ export default function Login() {
       <Button
         variant="outline"
         className="w-full h-12 text-sm font-medium mb-6"
-        onClick={handleGoogle}
+        onClick={loginWithGoogle}
+        disabled={isLoadingAuth}
       >
         <GoogleIcon className="w-5 h-5 mr-2" />
         Continue with Google

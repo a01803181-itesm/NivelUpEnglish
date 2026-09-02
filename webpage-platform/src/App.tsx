@@ -1,4 +1,3 @@
-import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { AuthProvider } from "./lib/AuthContext";
@@ -6,7 +5,7 @@ import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ScrollToTop from "./components/ScrollToTop";
 import Home from "./pages/Home";
-// import Login from "../pages/Login";
+import Login from "./pages/Login";
 
 export default function App() {
   return (
@@ -15,6 +14,9 @@ export default function App() {
         <BrowserRouter>
           <ScrollToTop />
           <Routes>
+
+            <Route path="/login" element={<Login/>}/>
+
             <Route 
               element={
                 <ProtectedRoute 
