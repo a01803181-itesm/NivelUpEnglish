@@ -6,6 +6,8 @@ load_dotenv()
 class Settings:
     PROJECT_NAME: str = "NivelUp English API"
 
+    FIREBASE_CREDENTIALS_PATH: str = os.getenv('FIREBASE_CREDENTIALS_PATH', "credentials.json")
+
     DB_NAME: str = os.getenv('DB_NAME', '')
     DB_HOST: str = os.getenv('DB_HOST', 'postgres')
     DB_PASSWORD: str = os.getenv('DB_PASSWORD', '')
