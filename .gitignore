@@ -2,5 +2,7 @@ node_modules
 
 __pycache__
 
+credentials.json
+*.venv
 *.env
 *.mp3
