@@ -1,4 +1,5 @@
 from psycopg import AsyncConnection
+from app.schemas.students import Student
 import logging
 
 logger = logging.getLogger(__name__)
