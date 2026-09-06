@@ -4,11 +4,13 @@ from contextlib import asynccontextmanager
 from app.core.database import db_manager
 from app.core.config import settings
 from app.api.router import base_router
+from app.core.firebase.firebase_setup import init_firebase
 from mangum import Mangum
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db_manager.initialize()
+    init_firebase()
     yield
     await db_manager.close()
 

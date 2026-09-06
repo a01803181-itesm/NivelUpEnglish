@@ -5,10 +5,10 @@ from app.crud import students, courses
 
 router = APIRouter()
 
-@router.get("/dashboard")
+@router.get("/")
 async def get_dashboard_data(
+    db: DBSession,
     token_data: dict = Depends(verify_firebase_token),
-    db: DBSession = None 
 ):
     firebase_uid = token_data.get("uid", "")
     google_name = token_data.get("name", "")
@@ -18,7 +18,7 @@ async def get_dashboard_data(
 
     if not success:
         raise HTTPException(status_code=500, detail="Database synchronization failed")
-        
+
     await db.commit()
     
     course_data = await courses.get_student_course(db, firebase_uid)
