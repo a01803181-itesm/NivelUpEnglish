@@ -62,6 +62,43 @@ async def get_students(conn: AsyncConnection) -> list[Student]:
         logger.error(f"Error reading all students: {e}")
         return []
 
+async def insert_student(conn: AsyncConnection, student: Student) -> Student | None:
+    query = """
+        INSERT INTO students
+        (student_id, course_id, name, email, phone_number)
+        VALUES (%s, %s, %s, %s, %s)
+        RETURNING student_id, course_id, name, email, phone_number;
+    """
+
+    try:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                    query,
+                    (
+                        student.student_id,
+                        student.course_id,
+                        student.name,
+                        student.email,
+                        student.phone_number,
+                    )
+                )
+
+            row = await cur.fetchone()
+            
+            if row:
+                return Student(
+                    student_id=row[0],
+                    course_id=row[1],
+                    name=row[2],
+                    email=row[3],
+                    phone_number=row[4]
+                )
+
+            return None
+    except Exception as e:
+        logger.error(f"Error during creation of student with ID {student.student_id}: {e}")
+        return None
+
 async def upsert_student(conn: AsyncConnection, firebase_uid: str, full_name: str, email: str) -> bool:
     query = """
         INSERT INTO students (student_id, name, email)
