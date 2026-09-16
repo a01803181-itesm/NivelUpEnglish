@@ -1,8 +1,7 @@
 from fastapi import APIRouter
-from app.core.database import DBSession
 
 router = APIRouter()
 
 @router.get('/')
-async def check(db: DBSession):
+async def check():
     return { "message": "herkese Merhaba!!" }
