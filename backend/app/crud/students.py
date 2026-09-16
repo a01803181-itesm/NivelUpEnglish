@@ -57,7 +57,7 @@ async def select_students(conn: AsyncConnection) -> list[Student]:
                     for row in rows
                 ]
 
-            return None
+            return []
     except Exception as e:
         logger.error(f"Error reading all students: {e}")
         return []

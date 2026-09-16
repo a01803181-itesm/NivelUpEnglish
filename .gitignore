@@ -4,5 +4,5 @@ __pycache__
 
 credentials.json
 *.venv
-*.env
-*.mp3
+.env*
+!*.example

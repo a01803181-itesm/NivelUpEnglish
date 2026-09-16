@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from typing import Any
+from app.core.firebase.security import verify_token
 from app.schemas.students import Student, StudentProfileUpdate
 from app.core.database import DBSession
 from app.crud.students import select_student, select_students, insert_student, update_student_profile, delete_student
@@ -24,7 +25,7 @@ async def read_student(
 @router.get("", response_model=list[Student])
 async def read_all_students(db: DBSession) -> Any:
     students = await select_students(db)
-    
+
     return students
 
 @router.post("", response_model=Student, status_code=status.HTTP_201_CREATED)
@@ -73,8 +74,15 @@ async def patch_student_profile(
 @router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def drop_student(
     db: DBSession,
-    student_id: str
+    student_id: str,
+    token_data: dict = Depends(verify_token)
 ) -> None:
+    if token_data.get("uid") != student_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to modify this account."
+        )
+    
     deleted = await delete_student(db, student_id)
 
     if not deleted:
