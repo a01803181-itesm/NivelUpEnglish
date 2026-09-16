@@ -1,5 +1,5 @@
 from psycopg import AsyncConnection
-from app.schemas.students import Student, StudentProfileUpdate
+from app.schemas.students import Student
 import logging
 
 logger = logging.getLogger(__name__)
@@ -135,6 +135,24 @@ async def update_student_profile(conn: AsyncConnection, student_id: str, updates
     except Exception as e:
         logger.error(f"Failed updating student with ID: {student_id}. {e}")
         return None
+
+async def delete_student(conn: AsyncConnection, student_id: str) -> bool:
+    query = """
+        DELETE FROM students
+        WHERE student_id = %s
+        RETURNING student_id;
+    """
+
+    try:
+        async with conn.cursor() as cur:
+            await cur.execute(query, (student_id,))
+
+            row = await cur.fetchone()
+
+            return row is not None
+    except Exception as e:
+        logger.error(f"Error deleting student with ID {student_id}: {e}")
+        return False
 
 async def upsert_student(conn: AsyncConnection, firebase_uid: str, full_name: str, email: str) -> bool:
     query = """

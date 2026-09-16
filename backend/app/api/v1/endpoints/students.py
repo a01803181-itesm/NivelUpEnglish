@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from typing import Any
 from app.schemas.students import Student, StudentProfileUpdate
 from app.core.database import DBSession
-from app.crud.students import select_student, select_students, insert_student, update_student_profile
+from app.crud.students import select_student, select_students, insert_student, update_student_profile, delete_student
 
 router = APIRouter()
 
@@ -15,7 +15,7 @@ async def read_student(
 
     if not student:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Student with ID {student_id} not found."
         )
 
@@ -24,7 +24,7 @@ async def read_student(
 @router.get("", response_model=list[Student])
 async def read_all_students(db: DBSession) -> Any:
     students = await select_students(db)
-
+    
     return students
 
 @router.post("", response_model=Student, status_code=status.HTTP_201_CREATED)
@@ -54,7 +54,7 @@ async def patch_student_profile(
 
     if not update_data:
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="No valid fields provided for update."
         )
     
@@ -62,10 +62,27 @@ async def patch_student_profile(
 
     if not updated_student:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Student with ID {student_id} not found."
         )
 
     await db.commit()
 
     return updated_student
+
+@router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def drop_student(
+    db: DBSession,
+    student_id: str
+) -> None:
+    deleted = await delete_student(db, student_id)
+
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Student with ID {student_id} not found."
+        )
+
+    await db.commit()
+
+    return None
