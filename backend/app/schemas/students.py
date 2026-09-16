@@ -7,9 +7,6 @@ class Student(BaseModel):
     email: EmailStr
     phone_number: str | None = None
 
-class StudentUpdate(BaseModel):
-    student_id: str | None = None
-    course_id: int | None = None
+class StudentProfileUpdate(BaseModel):
     name: str | None = None
-    email: EmailStr | None = None
     phone_number: str | None = None
